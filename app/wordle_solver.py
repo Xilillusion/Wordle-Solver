@@ -1,6 +1,8 @@
 import tkinter as tk
-from solvers import *
-from decision_tree import TreeDB
+
+from core.decision_tree import TreeDB
+from core.game import load_words
+from core.solvers import *
 
 # --- Constants ---
 SOLVERS = [Bayesian, Minimax, Heuristic, Random, Fixed]
@@ -20,31 +22,30 @@ COLOR_CYCLE = {
 agent = None
 tree = None
 attempt = None
-feedback = None
+result = None
 
 # --- Functions ---
 def start_game():
     """Starts or resets the game"""
-    global agent, tree, attempt
+    global agent, tree, attempt, result
     attempt = 0
+    result = None
 
-    if agent is None or agent.__repr__() != f"{selected_solver.get()}{"All" if search_all.get() else "Filtered"}":
+    if agent is None or str(agent) != selected_solver.get():
         Solver = SOLVERS[SOLVER_NAMES.index(selected_solver.get())]
-
-        agent = Solver(WORDS, search_all.get())
-
-        if decision_tree.get():
-            tree = TreeDB(agent.__repr__())
-        elif tree:
-            # Close the decision tree if it was previously opened
-            tree.close()
-            tree = None
-
+        agent = Solver(WORDS)
         start_button.config(text="New Game")
         submit_button.config(text="> Submit Feedback <")
-
     else:
         agent.reset()
+
+    if decision_tree.get() and (tree is None or tree.name != str(agent)):
+        if tree is not None:
+            tree.close()
+        tree = TreeDB(str(agent))
+    elif not decision_tree.get() and tree is not None:
+        tree.close()
+        tree = None
 
     init_feedback()
     make_guess()
@@ -57,8 +58,8 @@ def make_guess():
     result_label.config(text=f"Attempt {attempt}")
 
     # Make guess
-    if decision_tree.get() and agent.__repr__() != "RandomSolver":
-        guess = tree.get_node(agent.make_guess, feedback)
+    if tree is not None and str(agent) != "Random":
+        guess = tree.get_node(agent.make_guess, result)
     else:
         guess = agent.make_guess()
 
@@ -74,18 +75,18 @@ def submit_feedback():
         result_label.config(text="Warning: Press Start Game first")
         return
 
-    global feedback
-    feedback = [COLOR_MAP[button.cget("bg")] for button in feedback_buttons]
+    global result
+    result = [COLOR_MAP[button.cget("bg")] for button in feedback_buttons]
 
     # Handle the case where Wordle is solved
-    if feedback == [1] * WORD_LEN:
+    if result == [1] * WORD_LEN:
         global attempt
         result_label.config(text=f"Solved in {attempt} attempts!")
         attempt = 0
         return
     
     guess = "".join(button.cget("text") for button in feedback_buttons)
-    agent.filter_words(guess, feedback)
+    agent.filter(guess, result)
     make_guess()
 
 def init_feedback(guess=" " * WORD_LEN):
@@ -107,10 +108,6 @@ root.title("Wordle Solver")
 selected_solver = tk.StringVar(value=SOLVERS[0].__name__)
 tk.Label(root, text="Select a Solver:\t\t    ").pack(padx=10)
 tk.OptionMenu(root, selected_solver, *SOLVER_NAMES).pack()
-
-# Search All Checkbox
-search_all = tk.IntVar(value=1)
-tk.Checkbutton(root, text="Search All Words", variable=search_all).pack()
 
 # Decision Tree Checkbox
 decision_tree = tk.IntVar(value=1)
