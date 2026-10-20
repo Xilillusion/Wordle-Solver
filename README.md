@@ -84,6 +84,22 @@ py -m pip install matplotlib tqdm
 
 Solvers filter the possible answers after each piece of feedback. The `Bayesian`, `Minimax`, `Binary`, and `Greedy` solvers can consider words outside the remaining answer candidates as guesses; the `Limit` variants cannot.
 
+## Performance analysis
+
+The chart shows the distribution of guesses per game for each solver. Games requiring more than six guesses are counted as failures.
+
+![Distribution of guesses per solver](wordle_solver_comparison.png)
+
+| Solver | Fail Rate | Avg Guesses | Avg Guesses (Solved Games) |
+| --- | ---: | ---: | ---: |
+| Fixed | 1.65% | 3.98 | 3.92 |
+| Greedy | 1.04% | 3.72 | 3.68 |
+| Binary | 0.00% | 3.71 | 3.71 |
+| Minimax | 0.00% | 3.57 | 3.57 |
+| Bayesian | 0.00% | 3.46 | 3.46 |
+
+Bayesian has the lowest average number of guesses at 3.46, with no failures in this evaluation. Minimax also had no failures and averaged 3.57 guesses. Fixed had the highest average and failure rate among the compared solvers.
+
 ## Repository layout
 
 | Path | Contents |
