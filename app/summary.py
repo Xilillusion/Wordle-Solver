@@ -5,17 +5,8 @@ from tqdm import tqdm
 from core.solvers import *
 from core.decision_tree import DecisionTree, FakeTree
 
-SOLVERS = [
-    Fixed,
-    Heuristic,
-    SimpleMinimax,
-    Minimax,
-    SimpleBayesian,
-    Bayesian,
-]
-NO_TREE_SOLVERS = {"Fixed", "Random"}
-ANSWERS_LEN = len(ANSWERS)
 
+ANSWERS_LEN = len(ANSWERS)
 ATTEMPTS = 6  # Wordle allows 6 guesses
 
 def run(agent, tree):
@@ -79,23 +70,23 @@ def plot_comparison(stats):
     plt.show()
 
 
-def summary():
+def summary(solvers, no_tree_solvers):
     stats = {}
     table_data = []
 
-    for Solver in SOLVERS:
+    for Solver in solvers:
         agent = Solver()
         solver_name = str(agent)
 
         # Apply tree to non Fixed / Random solvers
-        tree = FakeTree() if solver_name in NO_TREE_SOLVERS else DecisionTree(solver_name)
+        tree = FakeTree() if solver_name in no_tree_solvers else DecisionTree(solver_name)
 
         stat, total_attempts = run(agent, tree)
 
         stats[agent] = stat
 
         # Metrics calculation
-        failed = sum(count for attempts, count in stat.items() if attempts > 6)
+        failed = sum(count for attempts, count in stat.items() if attempts > ATTEMPTS)
         solved = sum(stat.get(i, 0) for i in range(1, ATTEMPTS + 1))
         death_rate = (failed / ANSWERS_LEN) * 100
 
@@ -117,7 +108,7 @@ def summary():
     # Print markdown or tabulated table
     row_format = "{:<16} {:<12} {:<12} {:<15}"
     print("\n" + row_format.format(*headers))
-    print("-" * 72)
+    print("-" * 70)
     for row in table_data:
         print(row_format.format(*row))
 
@@ -125,4 +116,22 @@ def summary():
 
 
 if __name__ == "__main__":
-    summary()
+    solvers = [
+        Fixed,
+        Greedy,
+        Binary,
+        Minimax,
+        Bayesian,
+        #LimitMinimax,
+        #LimitBayesian,
+    ]
+    no_tree_solvers = {
+        "Fixed",
+        #"Greedy",
+        #"Binary",
+        #"Minimax",
+        #"Bayesian",
+        #"LimitMinimax",
+        #"LimitBayesian",
+    }
+    summary(solvers, no_tree_solvers)

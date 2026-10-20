@@ -1,7 +1,7 @@
 from math import log2
 from collections import Counter
 
-from core.game import ALLOWED, ANSWERS, WORD_LENGTH, WIN_RESULT, get_result, decode_result
+from core.game import ALLOWED, ANSWERS, WORD_LENGTH, WIN_RESULT, get_result
 
 
 class Handler:
@@ -31,7 +31,7 @@ class Handler:
 
 # --- Solvers ---
 
-class SimpleBayesian(Handler):
+class LimitBayesian(Handler):
     """Apply Bayesian search to find the word with highest entropy in the word list"""
     def guess(self):
         # Bayesian selection using precomputed entropy values
@@ -50,7 +50,7 @@ class SimpleBayesian(Handler):
                 entropy -= p * log2(p)
         return entropy
 
-class Bayesian(SimpleBayesian):
+class Bayesian(LimitBayesian):
     """Apply Bayesian search to find the word with highest entropy in the word list"""
     def guess(self):
         candidates = self.answers_range if len(self.answers_range) <= 3 else ALLOWED
@@ -76,7 +76,7 @@ class Bayesian(SimpleBayesian):
 
         return best_guess
 
-class SimpleMinimax(Handler):
+class LimitMinimax(Handler):
     """Maximize the minimum gain"""
     def guess(self):
         # Run minimax to find the best guess
@@ -125,38 +125,73 @@ class Minimax(Handler):
 
         return best_guess
 
-
-class Heuristic(Handler):
-    """Letter Frequency Heuristic Solver"""
+class Greedy(Handler):
+    """Positional Frequency Frequency Heuristic Solver. Greedy for green positions as human"""
     def __init__(self):
         super().__init__()
-        self.green_pos = [None] * WORD_LENGTH # Track the result of the green position
-    
+        self.green_mask = 0 # Track the result of the green position
+
     def reset(self):
         super().reset()
-        self.green_pos = [None] * WORD_LENGTH
+        self.green_mask = 0
     
     def filter(self, guess, result):
         super().filter(guess, result)
-        for i, f in enumerate(decode_result(result)):
-            if f == 2:
-                self.green_pos[i] = guess[i]
+        val = result
+        for i in range(WORD_LENGTH):
+            if val % 3 == 2:  # 2 for green
+                self.green_mask |= 1 << i
+            val //= 3
 
     def guess(self):
         pos_letter_freq = [Counter() for _ in range(WORD_LENGTH)]
-        for i in range(WORD_LENGTH):
-            if self.green_pos[i] is None:
-                for word in self.answers_range:
-                    pos_letter_freq[i][word[i]] += 1
+        active_indices = [i for i in range(WORD_LENGTH) if not ((self.green_mask >> i) & 1)]
+
+        for i in active_indices:
+            for word in self.answers_range:
+                pos_letter_freq[i][word[i]] += 1
                 
         candidates = self.answers_range if len(self.answers_range) <= 3 else ALLOWED
         answer_set = set(self.answers_range)
 
         def score(word):
+            seen = set()
             val = 0
-            for i in range(WORD_LENGTH):
-                if not self.green_pos[i]:
+            for i in active_indices:
+                c = word[i]
+                if c not in seen:
                     val += pos_letter_freq[i][word[i]]
+                    seen.add(c)
+            return (val, word in answer_set)
+
+        return max(candidates, key=score)
+
+class Binary(Handler):
+    def guess(self):
+        total_left = len(self.answers_range)
+        if total_left <= 2:
+            return self.answers_range[0]
+
+        # 1. Document Frequency
+        letter_doc_counts = [0] * 26
+        for word in self.answers_range:
+            for c in set(word):
+                letter_doc_counts[ord(c) - 65] += 1
+
+        # 2. Seperate in half, the closer to 50%, the higher score
+        split_score = [0] * 26
+        for i in range(26):
+            count = letter_doc_counts[i]
+            if 0 < count < total_left:
+                split_score[i] = count * (total_left - count)
+
+        candidates = self.answers_range if total_left <= 3 else ALLOWED
+        answer_set = set(self.answers_range)
+
+        # 3. Compute score for each candidate
+        def score(word):
+            unique_chars = set(word)
+            val = sum(split_score[ord(c) - 65] for c in unique_chars)
             return (val, word in answer_set)
 
         return max(candidates, key=score)
@@ -168,8 +203,8 @@ class Fixed(Handler):
 
 
 if __name__ == "__main__":
-    from core.game import encode_result
-    Solver = Heuristic   # Bayesian, Minimax, Heuristic, Random, Fixed
+    from core.game import encode
+    Solver = Bayesian   # Bayesian, Minimax, Greedy, Binary
     agent = Solver()
 
     print("Current solver:", agent)
@@ -194,7 +229,7 @@ if __name__ == "__main__":
                     continue
                 break
 
-            result = encode_result(result_list)
+            result = encode(result_list)
             if result == WIN_RESULT:
                 print(f"Solved in {attempt} attempts!")
                 break

@@ -12,11 +12,11 @@ WORD_LENGTH = len(ALLOWED[0])
 MAX_ATTEMPS = 6
 WIN_RESULT = 242
 
-def encode_result(r):
+def encode(r):
     # Compress to an int of base 3: r0 + r1*3 + r2*9 + r3*27 + r4*81
     return r[0] + r[1] * 3 + r[2] * 9 + r[3] * 27 + r[4] * 81
 
-def decode_result(val):
+def decode(val):
     res = [0] * 5
     for i in range(5):
         res[i] = val % 3
@@ -46,7 +46,7 @@ def get_result(guess, answer):
             else:
                 r[i] = 0
 
-    return r[0] + r[1] * 3 + r[2] * 9 + r[3] * 27 + r[4] * 81
+    return encode(r)
 
 
 if __name__ == "__main__":
@@ -54,7 +54,7 @@ if __name__ == "__main__":
 
     EMOJI_MAP = ("⬜", "🟨", "🟩")
     ALLOWED_SET = set(ALLOWED)
-    
+
     print(f"Welcome to Wordle!")
 
     while True:
@@ -73,7 +73,7 @@ if __name__ == "__main__":
                     continue
                 break
             
-            result = decode_result(get_result(guess, answer))
+            result = get_result(guess, answer)
             print(f"Result: {"".join([EMOJI_MAP[i] for i in result])}")
 
             if guess == answer:
