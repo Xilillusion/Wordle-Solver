@@ -1,18 +1,25 @@
 import tkinter as tk
 
-from core.decision_tree import TreeDB
-from core.game import load_words
+from core.decision_tree import DecisionTree
+from core.game import encode
 from core.solvers import *
 
 # --- Constants ---
-SOLVERS = [Bayesian, Minimax, Heuristic, Random, Fixed]
-SOLVER_NAMES = [s.__name__ for s in SOLVERS]
+SOLVERS = [
+    Bayesian,
+    Minimax,
+    Binary,
+    LimitMinimax,
+    LimitBayesian,
+    Greedy,
+    Fixed,
+]
+SOLVER_MAP = {s.__name__: s for s in SOLVERS}
+SOLVER_NAMES = list(SOLVER_MAP.keys())
 
-WORDS = load_words()
-WORD_LEN = len(WORDS[0])
-
-COLOR_MAP = {'green': 1, 'yellow': 0, 'black': -1}
+COLOR_MAP = {'green': 2, 'yellow': 1, 'black': 0}
 COLOR_CYCLE = {
+    # Current: (next, text)
     'green': ('yellow', 'black'),
     'yellow': ('black', 'white'),
     'black': ('green', 'white'),
@@ -21,7 +28,7 @@ COLOR_CYCLE = {
 # --- Global variables ---
 agent = None
 tree = None
-attempt = None
+attempt = 0
 result = None
 
 # --- Functions ---
@@ -31,23 +38,29 @@ def start_game():
     attempt = 0
     result = None
 
-    if agent is None or str(agent) != selected_solver.get():
-        Solver = SOLVERS[SOLVER_NAMES.index(selected_solver.get())]
-        agent = Solver(WORDS)
-        start_button.config(text="New Game")
-        submit_button.config(text="> Submit Feedback <")
+    selected_name = selected_solver.get()
+    solver_cls = SOLVER_MAP[selected_name]
+
+    # Initilize solver
+    if agent is None or agent.__class__.__name__ != selected_name:
+        agent = solver_cls()
+        start_button.config(text="Restart Game")
+        submit_button.config(text="Submit Feedback")
     else:
         agent.reset()
 
-    if decision_tree.get() and (tree is None or tree.name != str(agent)):
+    # Handle decision tree
+    if decision_tree.get() and selected_name not in {"Fixed", "Random"}:
+        if tree is None or tree.solver_name != selected_name:
+            if tree is not None:
+                tree.save()
+            tree = DecisionTree(selected_name)
+        tree.reset()
+    else:
         if tree is not None:
-            tree.close()
-        tree = TreeDB(str(agent))
-    elif not decision_tree.get() and tree is not None:
-        tree.close()
-        tree = None
+            tree.save()
+            tree = None
 
-    init_feedback()
     make_guess()
 
 def make_guess():
@@ -55,11 +68,11 @@ def make_guess():
     # Update attempts
     global attempt
     attempt += 1
-    result_label.config(text=f"Attempt {attempt}")
+    result_label.config(text=f"Attempt {attempt}/6", fg="black")
 
     # Make guess
-    if tree is not None and str(agent) != "Random":
-        guess = tree.get_node(agent.make_guess, result)
+    if tree is not None:
+        guess = tree.get_or_create_guess(agent.make_guess, result)
     else:
         guess = agent.make_guess()
 
@@ -67,7 +80,7 @@ def make_guess():
         result_label.config(text="Error: No guess available")
         return
 
-    init_feedback(guess)
+    update_feedback_buttons(guess)
 
 def submit_feedback():
     """Processes user feedback and updates the solver"""
@@ -76,25 +89,27 @@ def submit_feedback():
         return
 
     global result
-    result = [COLOR_MAP[button.cget("bg")] for button in feedback_buttons]
+    feedback_list = [COLOR_MAP[btn.cget("bg")] for btn in feedback_buttons]
+    result = encode(feedback_list)
 
     # Handle the case where Wordle is solved
-    if result == [1] * WORD_LEN:
+    if result == WIN_RESULT:
         global attempt
         result_label.config(text=f"Solved in {attempt} attempts!")
-        attempt = 0
+        if tree is not None:
+            tree.save()
         return
     
     guess = "".join(button.cget("text") for button in feedback_buttons)
     agent.filter(guess, result)
     make_guess()
 
-def init_feedback(guess=" " * WORD_LEN):
+def update_feedback_buttons(guess):
     """Initialize the feedback buttons' text and color"""
     for i, button in enumerate(feedback_buttons):
         button.config(text=guess[i], bg='green', fg='white')
 
-def change_color(i):
+def cycle_color(i):
     """Cycles through feedback colors on button click."""
     next_color, next_text_color = COLOR_CYCLE[feedback_buttons[i].cget("bg")]
     feedback_buttons[i].config(bg=next_color, fg=next_text_color)
@@ -122,10 +137,10 @@ color_frame = tk.Frame(root)
 color_frame.pack()
 
 feedback_buttons = []
-for i in range(WORD_LEN):
+for i in range(WORD_LENGTH):
     button = tk.Button(
         color_frame, text=" ", width=3, height=1, bg='green',
-        font=15, fg="white", command=lambda i=i: change_color(i))
+        font=15, fg="white", command=lambda i=i: cycle_color(i))
     button.pack(side=tk.LEFT, padx=1)
     feedback_buttons.append(button)
 

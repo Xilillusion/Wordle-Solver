@@ -1,69 +1,84 @@
-# Wordle Solvers
+# Wordle Solver
 
-Apply Bayesian/Minimax/Heuristic solvers to solve the Wordle game
-- `words.txt`: 2308 Wordle words from [Silicon Valley Daily](https://svdaily.com/2022/04/15/all-of-the-words-used-in-ny-times-wordle-game/ )
-- `Tools\game.py`: A rough version of Wordle. Run to play manually
-- `solvers.py`: Includes **Handler** and **Solvers**. Run to manually test the selected solver
-- `tree.db`: A sqlite database, a tree-like structure to store pre-trained solvers
-- `decision_tree.py`: Read and update `tree.db`
-- `test.py`: Run to test all solvers and generate an overview
-- `Tools\test_result.py`: a pre-generated overview for all the solvers
+A Python Wordle assistant with a Tkinter interface, an interactive command-line game, and several algorithms for choosing guesses. The solver compares feedback against a local answer list and can use JSON decision trees to reuse previously calculated guesses.
 
-  <img src="https://github.com/user-attachments/assets/2e477f14-ce7c-46d4-8606-e946492cf0b5" alt="ScreenShot" width="400"/>
+## Requirements
 
-- `wordle_solver.py`: source code of the Wordle Solver app
+- Python 3.12 or later
+- Tkinter, typically included with Python
+- `matplotlib` and `tqdm` only for running the solver comparison
 
-  <img src="https://github.com/user-attachments/assets/31633650-d056-4bad-8a0f-9fae2fce5679" alt="ScreenShotApp" width="200"/>
+No third-party packages are required for the GUI, command-line game, or interactive solver.
 
-## Releases
-Download both `WordleSolver.exe` and `word.txt`. You can update word.txt with the newest Wordle database.
+Run the commands below from the repository root so the application can find the word lists and decision-tree files.
 
-> [Download HERE](https://github.com/Yingwen-Liu/Wordle_Solvers_Bayesian_Minimax_Heuristic/releases)
+## Run the app
 
-*Note that Window Defender likes to delete the app :(*
+Launch the GUI:
 
-## Handler
-- `Handler`: Ability to remove words that not match the feedback from the word list
-- `search_all=True`: set the search range as the entire database, not only the filtered words, which means more iterations and much slower execution
+```powershell
+py -m app.wordle_solver
+```
+
+Choose a solver and select **Start Game**. Enter its guess in Wordle, then click each letter tile until its color matches the feedback:
+
+- Green: correct letter in the correct position
+- Yellow: correct letter in the wrong position
+- Gray: letter is not in the answer
+
+Tiles cycle green → yellow → gray. Select **Submit Feedback** to get the next guess. The **Pre-Trained Solver** option uses the matching JSON decision tree in `trees\` when available; missing branches are calculated and saved as you play. Turn it off to calculate guesses directly. The `Fixed` solver does not use a decision tree.
+
+## Command-line tools
+
+Play a local Wordle game with a randomly selected answer:
+
+```powershell
+py -m core.game
+```
+
+Try a solver interactively by entering the feedback for each guess as five digits (`0` = gray, `1` = yellow, `2` = green):
+
+```powershell
+py -m core.solvers
+```
+
+The solver comparison evaluates the configured solvers against the answer list, prints summary statistics, and creates `wordle_solver_comparison.png`:
+
+```powershell
+py -m app.summary
+```
+
+The comparison uses `matplotlib` and `tqdm`. Install them if needed:
+
+```powershell
+py -m pip install matplotlib tqdm
+```
 
 ## Solvers
-| Solver      | Average Attempts (*Filtered) | (*All)         | Time Consumption |
-| ----------- | ---------------------------- | -------------- | ---------------- |
-| `Bayesian`  | 3.6050                       | 3.5613         |         |
-| `Minimax`   | 3.6786                       | 3.6856         |              |
-| `Heuristic` | 3.6626                       | 3.7397         |          |
-| `Random`    | ~4.1                         | -              | -                |
-| `Fixed`     | 3.9853                       | -              | -                |
 
-*Filtered: search_all=False, All: search_all=True
+| Solver | Strategy |
+| --- | --- |
+| `Bayesian` | Chooses a guess with high expected information gain (entropy), considering all allowed guesses while many answers remain. |
+| `Minimax` | Chooses a guess that minimizes the size of the largest possible remaining answer group. |
+| `Binary` | Scores guesses by how effectively their distinct letters divide the remaining answers. |
+| `Greedy` | Scores letters by their positional frequency among remaining answers, prioritizing unresolved positions. |
+| `LimitBayesian` | Uses the Bayesian entropy strategy but only considers remaining answers as guesses. |
+| `LimitMinimax` | Uses the minimax strategy but only considers remaining answers as guesses. |
+| `Fixed` | A deterministic baseline that selects an answer at a fixed position in the remaining list. |
 
-*In general, the time consumption of Filtered < All
+Solvers filter the possible answers after each piece of feedback. The `Bayesian`, `Minimax`, `Binary`, and `Greedy` solvers can consider words outside the remaining answer candidates as guesses; the `Limit` variants cannot.
 
-### Description
-- `Bayesian`: Apply Bayesian search to find the word with highest entropy
-- `Minimax`: Maximize the minimum gain. Solve in fewest steps
-- `Heuristic`: Make guess based on the most frequently word
-- `Random`: Randomly select a word from the word list
-- `Fixed`: Select the word that in the middle of the word list. A better standard of evaluation than `Random` Solver
+## Repository layout
 
-## Graphs (from `test_result.py`)
-### All (search_all=True)
-<img src="https://github.com/user-attachments/assets/76d03acf-625f-489a-954b-c671ed363e90" alt="All" width="800"/>
+| Path | Contents |
+| --- | --- |
+| `app\wordle_solver.py` | Tkinter Wordle assistant |
+| `app\summary.py` | Solver evaluation and comparison chart |
+| `core\game.py` | Word lists, feedback encoding, and command-line game |
+| `core\solvers.py` | Solver algorithms and interactive solver |
+| `core\decision_tree.py` | JSON decision-tree loading, traversal, and saving |
+| `dict\allowed.txt` | Allowed guess words |
+| `dict\answers.txt` | Possible answer words |
+| `trees\` | Saved decision trees, one JSON file per solver |
 
-### Filtered (search_all=False)
-<img src="https://github.com/user-attachments/assets/cf2841a8-0023-4e7d-aaed-6f485b8d955d" alt="Filtered" width="800"/>
-
-### Bayesian Solvers
-<img src="https://github.com/user-attachments/assets/d368e4ed-6a0a-4f92-9e4b-8b5c9cf975ff" alt="Bayesian" width="500"/>
-
-### Minimax Solvers
-<img src="https://github.com/user-attachments/assets/4864f342-d4e9-4331-8f89-be9dc29402b5" alt="Minimax" width="500"/>
-
-### Heuristic Solvers
-<img src="https://github.com/user-attachments/assets/baa00c92-b8f0-4458-a571-fe5c49d84855" alt="Heuristic" width="500"/>
-
-## Libraries
-- tqdm
-- matplotlib
-- Tkinter
-- sqlite
+The word lists are stored locally and are not updated automatically. Their source is documented in [`dict/README.md`](dict/README.md). Decision trees are local JSON data and may grow as new feedback paths are explored.
