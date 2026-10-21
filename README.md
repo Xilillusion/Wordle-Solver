@@ -78,8 +78,8 @@ py -m pip install matplotlib tqdm
 | `Minimax` | Chooses a guess that minimizes the size of the largest possible remaining answer group. |
 | `Binary` | Scores guesses by how effectively their distinct letters divide the remaining answers. |
 | `Greedy` | Scores letters by their positional frequency among remaining answers, prioritizing unresolved positions. |
-| `LimitBayesian` | Uses the Bayesian entropy strategy but only considers remaining answers as guesses. |
-| `LimitMinimax` | Uses the minimax strategy but only considers remaining answers as guesses. |
+| `LimitBayesian` | Uses the Bayesian entropy strategy but only considers answers as guesses. |
+| `LimitMinimax` | Uses the minimax strategy but only considers answers as guesses. |
 | `Fixed` | A deterministic baseline that selects an answer at a fixed position in the remaining list. |
 
 Solvers filter the possible answers after each piece of feedback. The `Bayesian`, `Minimax`, `Binary`, and `Greedy` solvers can consider words outside the remaining answer candidates as guesses; the `Limit` variants cannot.

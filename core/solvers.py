@@ -39,7 +39,7 @@ class LimitBayesian(Handler):
     
     def compute_information_gain(self, guess):
         counts = [0] * (WIN_RESULT + 1)
-        for word in self.answers_range:
+        for word in ANSWERS:
             counts[get_result(guess, word)] += 1
 
         total = len(self.answers_range)
@@ -84,7 +84,7 @@ class LimitMinimax(Handler):
         min_worst_case = float('inf')
         
         # Simulate all possible result scenarios for this guess
-        for guess in self.answers_range:
+        for guess in ANSWERS:
             counts = [0] * (WIN_RESULT + 1)
             for word in self.answers_range:
                 counts[get_result(guess, word)] += 1
