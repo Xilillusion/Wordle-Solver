@@ -5,10 +5,10 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 
 from core.decision_tree import DecisionTree, FakeTree
+from core.game import MAX_ATTEMPTS
 from core.solvers import *
 
 
-ATTEMPTS = 6
 SolverType = type[Handler]
 Distribution = Counter[int]
 
@@ -45,14 +45,14 @@ def evaluate_solver(agent: Handler, tree: DecisionTree | FakeTree) -> Distributi
 
 def calculate_metrics(results: Distribution) -> tuple[float, float, float]:
     total_games = sum(results.values())
-    failed_games = sum(count for attempts, count in results.items() if attempts > ATTEMPTS)
+    failed_games = sum(count for attempts, count in results.items() if attempts > MAX_ATTEMPTS)
     solved_games = total_games - failed_games
 
     total_attempts = sum(attempts * count for attempts, count in results.items())
     solved_attempts = sum(
         attempts * count
         for attempts, count in results.items()
-        if attempts <= ATTEMPTS
+        if attempts <= MAX_ATTEMPTS
     )
 
     return (
@@ -112,7 +112,7 @@ def plot_boxplot(stats: dict[str, Distribution]) -> None:
     )
     ax.invert_yaxis()
 
-    max_attempts_line = ax.axvline(x=ATTEMPTS, label=f"Max Limit ({ATTEMPTS})")
+    max_attempts_line = ax.axvline(x=MAX_ATTEMPTS, label=f"Max Limit ({MAX_ATTEMPTS})")
     mean_line = boxplot["means"][0]
     mean_line.set_label("Mean")
     outlier = next(
@@ -126,7 +126,7 @@ def plot_boxplot(stats: dict[str, Distribution]) -> None:
     ax.set_ylabel("Solver")
     ax.legend(
         [mean_line, max_attempts_line, outlier],
-        ["Mean", f"Max Limit ({ATTEMPTS})", "Outlier"],
+        ["Mean", f"Max Limit ({MAX_ATTEMPTS})", "Outlier"],
     )
 
     plt.tight_layout()
