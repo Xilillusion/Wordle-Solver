@@ -74,15 +74,17 @@ py -m pip install matplotlib tqdm
 
 | Solver | Strategy |
 | --- | --- |
-| `Bayesian` | Chooses a guess with high expected information gain (entropy), considering all allowed guesses while many answers remain. |
-| `Minimax` | Chooses a guess that minimizes the size of the largest possible remaining answer group. |
-| `Binary` | Scores guesses by how effectively their distinct letters divide the remaining answers. |
-| `Greedy` | Scores letters by their positional frequency among remaining answers, prioritizing unresolved positions. |
-| `LimitBayesian` | Uses the Bayesian entropy strategy but only considers answers as guesses. |
-| `LimitMinimax` | Uses the minimax strategy but only considers answers as guesses. |
-| `Fixed` | A deterministic baseline that selects an answer at a fixed position in the remaining list. |
+| `Entropy` | Chooses guesses with high expected information gain (entropy), considering all allowed guesses until only a few answers remain. |
+| `NaiveEntropy` | Chooses the allowed guess with the highest expected information gain across all candidate counts. |
+| `BiasedEntropy` | Uses entropy scoring with a small bonus for guesses that are possible answers. |
+| `LookaheadEntropy` | Uses a two-step lookahead for smaller candidate sets and one-step entropy scoring for larger sets. |
+| `Minimax` | Chooses a guess that minimizes the largest possible remaining answer group, considering only answers when few candidates remain. |
+| `NaiveMinimax` | Chooses the allowed guess that minimizes the largest possible remaining answer group. |
+| `BinarySplit` | Scores guesses by how effectively their distinct letters divide the remaining answers into similarly sized groups. |
+| `PositionalFreq` | Scores guesses by the positional frequency of letters among remaining answers, prioritizing unresolved positions. |
+| `FixedIndex` | Selects an answer at a fixed position in the remaining list. |
 
-Solvers filter the possible answers after each piece of feedback. The `Bayesian`, `Minimax`, `Binary`, and `Greedy` solvers can consider words outside the remaining answer candidates as guesses; the `Limit` variants cannot.
+Solvers filter the possible answers after each piece of feedback. Solvers that consider all allowed words as guesses can use words outside the remaining answer candidates; `Entropy` and `Minimax` switch to remaining answers when only a few candidates remain.
 
 ## Performance analysis
 
@@ -92,13 +94,17 @@ The chart shows the distribution of guesses per game for each solver. Games requ
 
 | Solver | Fail Rate | Avg Guesses | Avg Guesses (Solved Games) |
 | --- | ---: | ---: | ---: |
-| Fixed | 1.65% | 3.98 | 3.92 |
-| Greedy | 1.04% | 3.72 | 3.68 |
-| Binary | 0.00% | 3.71 | 3.71 |
-| Minimax | 0.00% | 3.57 | 3.57 |
-| Bayesian | 0.00% | 3.46 | 3.46 |
+| FixedIndex | 1.65% | 3.9796 | 3.9238 |
+| PositionalFreq | 1.04% | 3.7202 | 3.6818 |
+| BinarySplit | 0.00% | 3.7142 | 3.7142 |
+| NaiveMinimax | 0.00% | 3.6769 | 3.6769 |
+| Minimax | 0.00% | 3.5738 | 3.5738 |
+| NaiveEntropy | 0.00% | 3.5275 | 3.5275 |
+| Entropy | 0.00% | 3.4643 | 3.4643 |
+| BiasedEntropy | 0.00% | 3.4638 | 3.4638 |
+| LookaheadEntropy | 0.00% | 3.4604 | 3.4604 |
 
-Bayesian has the lowest average number of guesses at 3.46, with no failures in this evaluation. Minimax also had no failures and averaged 3.57 guesses. Fixed had the highest average and failure rate among the compared solvers.
+LookaheadEntropy had the lowest average at 3.4604 guesses, with no failures; BiasedEntropy and Entropy were close behind at 3.4638 and 3.4643. FixedIndex had the highest average and failure rate among the compared solvers.
 
 ## Repository layout
 
@@ -112,6 +118,6 @@ Bayesian has the lowest average number of guesses at 3.46, with no failures in t
 | `core\decision_tree.py` | JSON decision-tree loading, traversal, and saving |
 | `dict\allowed.txt` | Allowed guess words |
 | `dict\answers.txt` | Possible answer words |
-| `trees\` | Saved decision trees, one JSON file per solver |
+| `trees\` | Saved decision trees, named by solver and mean guesses |
 
-The word lists are stored locally and are not updated automatically. Their source is documented in [`dict/README.md`](dict/README.md). Decision trees are local JSON data and may grow as new feedback paths are explored.
+The word lists are stored locally and are not updated automatically. Their source is documented in [`dict/README.md`](dict/README.md). Decision trees are local JSON data, named with the solver and its mean guesses, and may grow as new feedback paths are explored.

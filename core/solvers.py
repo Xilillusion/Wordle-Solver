@@ -1,5 +1,5 @@
 from math import log2
-from collections import Counter
+from collections import Counter, defaultdict
 
 from core.game import ALLOWED, ANSWERS, WORD_LENGTH, WIN_RESULT, get_result
 
@@ -31,15 +31,15 @@ class Handler:
 
 # --- Solvers ---
 
-class LimitBayesian(Handler):
+class NaiveEntropy(Handler):
     """Apply Bayesian search to find the word with highest entropy in the word list"""
     def guess(self):
         # Bayesian selection using precomputed entropy values
-        return max(self.answers_range, key=self.compute_information_gain)
+        return max(ALLOWED, key=self.compute_information_gain)
     
     def compute_information_gain(self, guess):
         counts = [0] * (WIN_RESULT + 1)
-        for word in ANSWERS:
+        for word in self.answers_range:
             counts[get_result(guess, word)] += 1
 
         total = len(self.answers_range)
@@ -50,7 +50,8 @@ class LimitBayesian(Handler):
                 entropy -= p * log2(p)
         return entropy
 
-class Bayesian(LimitBayesian):
+
+class Entropy(NaiveEntropy):
     """Apply Bayesian search to find the word with highest entropy in the word list"""
     def guess(self):
         candidates = self.answers_range if len(self.answers_range) <= 3 else ALLOWED
@@ -74,9 +75,153 @@ class Bayesian(LimitBayesian):
                 best_guess = word
                 best_in_answers = in_answers
 
+        return best_guess  
+
+
+class BiasedEntropy(NaiveEntropy):
+    """
+    """
+    def __init__(self, step_weight=0.1):
+        super().__init__()
+        self.win_weight = step_weight  # May need some fine-tunning
+
+    def guess(self):
+        total = len(self.answers_range)
+        candidates = self.answers_range if total <= 3 else ALLOWED
+        answer_set = set(self.answers_range)
+
+        best_guess = None
+        max_score = -1.0
+        best_in_answers = False
+
+        for word in candidates:
+            entropy = self.compute_information_gain(word)
+            in_answers = word in answer_set
+            p_win = (self.win_weight / total) if in_answers else 0.0
+            score = entropy + p_win
+
+            if score > max_score or (
+                abs(score - max_score) < 1e-6
+                and in_answers
+                and not best_in_answers
+            ):
+                max_score = score
+                best_guess = word
+                best_in_answers = in_answers
+
         return best_guess
 
-class LimitMinimax(Handler):
+
+class LookaheadEntropy(NaiveEntropy):
+    """
+    Beam-Search accelerated Two-step lookahead solver.
+    """
+    LOOKAHEAD_THRESHOLD = 24
+    BEAM_WIDTH = 20
+
+    def guess(self):
+        total = len(self.answers_range)
+        if total <= 2:
+            return self.answers_range[0]
+
+        if total > self.LOOKAHEAD_THRESHOLD:
+            return self._fast_one_step()
+        return self._pruned_two_step()
+
+    def _fast_one_step(self):
+        answer_set = set(self.answers_range)
+        best_guess = None
+        max_entropy = -1.0
+        best_in_answers = False
+
+        for word in ALLOWED:
+            entropy = self.compute_information_gain(word)
+            in_answers = word in answer_set
+
+            if (entropy > max_entropy) or (
+                abs(entropy - max_entropy) < 1e-6
+                and in_answers
+                and not best_in_answers
+            ):
+                max_entropy = entropy
+                best_guess = word
+                best_in_answers = in_answers
+
+        return best_guess
+
+    def _pruned_two_step(self):
+        total = len(self.answers_range)
+        answer_set = set(self.answers_range)
+
+        scored_allowed = []
+        for word in ALLOWED:
+            h = self.compute_information_gain(word)
+            scored_allowed.append((h, word))
+        scored_allowed.sort(reverse=True, key=lambda x: x[0])
+
+        beam_candidates = set(self.answers_range)
+        for _, word in scored_allowed[: self.BEAM_WIDTH]:
+            beam_candidates.add(word)
+
+        best_guess = None
+        min_expected_cost = float("inf")
+        best_in_answers = False
+
+        for g1 in beam_candidates:
+            partitions = defaultdict(list)
+            for w in self.answers_range:
+                partitions[get_result(g1, w)].append(w)
+
+            total_steps = 0
+
+            for pattern, sub_answers in partitions.items():
+                size = len(sub_answers)
+
+                if pattern == WIN_RESULT:
+                    total_steps += 1
+                elif size == 1:
+                    total_steps += 2
+                elif size == 2:
+                    total_steps += 5    # 2 + 3
+                else:
+                    best_sub = float("inf")
+                    for g2 in sub_answers:
+                        sub_counts = defaultdict(int)
+                        for sw in sub_answers:
+                            sub_counts[get_result(g2, sw)] += 1
+
+                        sub_steps = 0
+                        for sub_pat, cnt in sub_counts.items():
+                            if sub_pat == WIN_RESULT:
+                                sub_steps += 2 * cnt
+                            elif cnt == 1:
+                                sub_steps += 3
+                            elif cnt == 2:
+                                sub_steps += 7  # 3 + 4
+                            else:
+                                sub_steps += (3 + cnt) * cnt
+
+                        if sub_steps < best_sub:
+                            best_sub = sub_steps
+
+                    total_steps += best_sub
+
+            expected_cost = total_steps / total
+            in_answers = g1 in answer_set
+
+            if (expected_cost < min_expected_cost) or (
+                abs(expected_cost - min_expected_cost) < 1e-6
+                and in_answers
+                and not best_in_answers
+            ):
+                min_expected_cost = expected_cost
+                best_guess = g1
+                best_in_answers = in_answers
+
+        return best_guess
+
+    
+class NaiveMinimax(Handler):
     """Maximize the minimum gain"""
     def guess(self):
         # Run minimax to find the best guess
@@ -84,7 +229,7 @@ class LimitMinimax(Handler):
         min_worst_case = float('inf')
         
         # Simulate all possible result scenarios for this guess
-        for guess in ANSWERS:
+        for guess in ALLOWED:
             counts = [0] * (WIN_RESULT + 1)
             for word in self.answers_range:
                 counts[get_result(guess, word)] += 1
@@ -96,6 +241,7 @@ class LimitMinimax(Handler):
                 best_guess = guess
         
         return best_guess
+
 
 class Minimax(Handler):
     def guess(self):
@@ -125,8 +271,9 @@ class Minimax(Handler):
 
         return best_guess
 
-class Greedy(Handler):
-    """Positional Frequency Frequency Heuristic Solver. Greedy for green positions as human"""
+
+class PositionalFreq(Handler):
+    """Positional Frequency Heuristic Solver."""
     def __init__(self):
         super().__init__()
         self.green_mask = 0 # Track the result of the green position
@@ -166,7 +313,8 @@ class Greedy(Handler):
 
         return max(candidates, key=score)
 
-class Binary(Handler):
+
+class BinarySplit(Handler):
     def guess(self):
         total_left = len(self.answers_range)
         if total_left <= 2:
@@ -196,15 +344,20 @@ class Binary(Handler):
 
         return max(candidates, key=score)
 
-class Fixed(Handler):
+
+class FixedIndex(Handler):
     """Select the word at a fixed position the word list"""
-    def guess(self, pos=2):
-        return self.answers_range[len(self.answers_range) // pos]
+    def __init__(self, pos=2):
+        super().__init__()
+        self.pos = pos
+
+    def guess(self):
+        return self.answers_range[len(self.answers_range) // self.pos]
 
 
 if __name__ == "__main__":
     from core.game import encode
-    Solver = Bayesian   # Bayesian, Minimax, Greedy, Binary
+    Solver = Entropy   # Bayesian, Minimax, Greedy, Binary
     agent = Solver()
 
     print("Current solver:", agent)

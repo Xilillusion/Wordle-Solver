@@ -1,28 +1,40 @@
 import tkinter as tk
 
 from core.decision_tree import DecisionTree
-from core.game import encode
-from core.solvers import *
+from core.game import MAX_ATTEMPS, WORD_LENGTH, WIN_RESULT, encode
+from core.solvers import (
+    BiasedEntropy,
+    BinarySplit,
+    Entropy,
+    FixedIndex,
+    LookaheadEntropy,
+    Minimax,
+    NaiveEntropy,
+    NaiveMinimax,
+    PositionalFreq,
+)
 
 # --- Constants ---
 SOLVERS = [
-    Bayesian,
+    LookaheadEntropy,
+    BiasedEntropy,
+    Entropy,
+    NaiveEntropy,
     Minimax,
-    Binary,
-    LimitMinimax,
-    LimitBayesian,
-    Greedy,
-    Fixed,
+    NaiveMinimax,
+    BinarySplit,
+    PositionalFreq,
+    FixedIndex,
 ]
 SOLVER_MAP = {s.__name__: s for s in SOLVERS}
 SOLVER_NAMES = list(SOLVER_MAP.keys())
 
-COLOR_MAP = {'green': 2, 'yellow': 1, 'black': 0}
+DARK_GRAY = '#555555'
+COLOR_MAP = {DARK_GRAY: 0, 'yellow': 1, 'green': 2}
 COLOR_CYCLE = {
-    # Current: (next, text)
-    'green': ('yellow', 'black'),
-    'yellow': ('black', 'white'),
-    'black': ('green', 'white'),
+    DARK_GRAY: ('yellow', 'black'),
+    'yellow': ('green', 'white'),
+    'green': (DARK_GRAY, 'white'),
 }
 
 # --- Global variables ---
@@ -45,12 +57,12 @@ def start_game():
     if agent is None or agent.__class__.__name__ != selected_name:
         agent = solver_cls()
         start_button.config(text="Restart Game")
-        submit_button.config(text="Submit Feedback")
     else:
         agent.reset()
+    submit_button.config(state=tk.NORMAL, text="Submit Feedback")
 
     # Handle decision tree
-    if decision_tree.get() and selected_name not in {"Fixed", "Random"}:
+    if decision_tree.get() and selected_name != "FixedIndex":
         if tree is None or tree.solver_name != selected_name:
             if tree is not None:
                 tree.save()
@@ -68,7 +80,7 @@ def make_guess():
     # Update attempts
     global attempt
     attempt += 1
-    result_label.config(text=f"Attempt {attempt}/6", fg="black")
+    result_label.config(text=f"Attempt {attempt}/{MAX_ATTEMPS}", fg="black")
 
     # Make guess
     if tree is not None:
@@ -78,6 +90,7 @@ def make_guess():
 
     if not guess:
         result_label.config(text="Error: No guess available")
+        submit_button.config(state=tk.DISABLED)
         return
 
     update_feedback_buttons(guess)
@@ -96,18 +109,25 @@ def submit_feedback():
     if result == WIN_RESULT:
         global attempt
         result_label.config(text=f"Solved in {attempt} attempts!")
+        submit_button.config(state=tk.DISABLED)
         if tree is not None:
             tree.save()
         return
     
     guess = "".join(button.cget("text") for button in feedback_buttons)
     agent.filter(guess, result)
+    if attempt >= MAX_ATTEMPS:
+        result_label.config(text=f"Out of guesses after {MAX_ATTEMPS} attempts.")
+        submit_button.config(state=tk.DISABLED)
+        if tree is not None:
+            tree.save()
+        return
     make_guess()
 
 def update_feedback_buttons(guess):
     """Initialize the feedback buttons' text and color"""
     for i, button in enumerate(feedback_buttons):
-        button.config(text=guess[i], bg='green', fg='white')
+        button.config(text=guess[i], bg=DARK_GRAY, fg='white')
 
 def cycle_color(i):
     """Cycles through feedback colors on button click."""
@@ -139,7 +159,7 @@ color_frame.pack()
 feedback_buttons = []
 for i in range(WORD_LENGTH):
     button = tk.Button(
-        color_frame, text=" ", width=3, height=1, bg='green',
+        color_frame, text=" ", width=3, height=1, bg=DARK_GRAY,
         font=15, fg="white", command=lambda i=i: cycle_color(i))
     button.pack(side=tk.LEFT, padx=1)
     feedback_buttons.append(button)
