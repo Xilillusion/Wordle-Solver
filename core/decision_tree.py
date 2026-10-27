@@ -66,14 +66,16 @@ class DecisionTree:
     @classmethod
     def _format_children(cls, children: dict, indent: int) -> list[str]:
         lines = []
-        for result, (guess, descendants) in children.items():
+        items = list(children.items())
+        for index, (result, (guess, descendants)) in enumerate(items):
+            comma = "," if index < len(items) - 1 else ""
             prefix = " " * indent + f"{json.dumps(result)}: [{json.dumps(guess)}, "
             if descendants:
                 lines.append(prefix + "{")
                 lines.extend(cls._format_children(descendants, indent + 2))
-                lines.append(" " * indent + "}]")
+                lines.append(" " * indent + "}]" + comma)
             else:
-                lines.append(prefix + "{}]")
+                lines.append(prefix + "{}]" + comma)
         return lines
 
     def reset(self):

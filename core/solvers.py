@@ -1,13 +1,20 @@
 from math import log2
-from collections import Counter, defaultdict
+from collections import defaultdict
 
-from core.game import ALLOWED, ANSWERS, WORD_LENGTH, WIN_RESULT, get_result
+from core.game import (
+    ALLOWED, 
+    ANSWERS, 
+    WIN_RESULT, 
+    get_result
+)
 
+ANSWERS_LEN = len(ANSWERS)
 
 class Handler:
     """Basic algorithm to start the game and filter the words based on the feedback"""
-    def __init__(self):
+    def __init__(self, opening = "SALET"):
         self.answers_range = ANSWERS.copy()
+        self.opening = opening.upper()
     
     def __str__(self):
         return self.__class__.__name__
@@ -20,14 +27,17 @@ class Handler:
         self.answers_range = [w for w in self.answers_range if get_result(guess, w) == result]
     
     def make_guess(self):
-        len_words = len(self.answers_range)
-        if len_words == 0:
+        total = len(self.answers_range)
+        if total == 0:
             return
         # If only 1-2 answers left, make a direct guess
-        if len_words <= 2:
+        if total <= 2:
             return self.answers_range[0]
+        if self.opening and total == ANSWERS_LEN:
+            return self.opening
 
         return self.guess()
+
 
 # --- Solvers ---
 
@@ -81,9 +91,7 @@ class Entropy(NaiveEntropy):
 class BiasedEntropy(NaiveEntropy):
     """
     """
-    def __init__(self, step_weight=0.1):
-        super().__init__()
-        self.win_weight = step_weight  # May need some fine-tunning
+    WIN_WEIGHT = 0.1
 
     def guess(self):
         total = len(self.answers_range)
@@ -97,7 +105,7 @@ class BiasedEntropy(NaiveEntropy):
         for word in candidates:
             entropy = self.compute_information_gain(word)
             in_answers = word in answer_set
-            p_win = (self.win_weight / total) if in_answers else 0.0
+            p_win = (self.WIN_WEIGHT / total) if in_answers else 0.0
             score = entropy + p_win
 
             if score > max_score or (
@@ -120,11 +128,7 @@ class LookaheadEntropy(NaiveEntropy):
     BEAM_WIDTH = 20
 
     def guess(self):
-        total = len(self.answers_range)
-        if total <= 2:
-            return self.answers_range[0]
-
-        if total > self.LOOKAHEAD_THRESHOLD:
+        if len(self.answers_range) > self.LOOKAHEAD_THRESHOLD:
             return self._fast_one_step()
         return self._pruned_two_step()
 
@@ -219,7 +223,6 @@ class LookaheadEntropy(NaiveEntropy):
                 best_in_answers = in_answers
 
         return best_guess
-
     
 class NaiveMinimax(Handler):
     """Maximize the minimum gain"""
@@ -272,48 +275,6 @@ class Minimax(Handler):
         return best_guess
 
 
-class PositionalFreq(Handler):
-    """Positional Frequency Heuristic Solver."""
-    def __init__(self):
-        super().__init__()
-        self.green_mask = 0 # Track the result of the green position
-
-    def reset(self):
-        super().reset()
-        self.green_mask = 0
-    
-    def filter(self, guess, result):
-        super().filter(guess, result)
-        val = result
-        for i in range(WORD_LENGTH):
-            if val % 3 == 2:  # 2 for green
-                self.green_mask |= 1 << i
-            val //= 3
-
-    def guess(self):
-        pos_letter_freq = [Counter() for _ in range(WORD_LENGTH)]
-        active_indices = [i for i in range(WORD_LENGTH) if not ((self.green_mask >> i) & 1)]
-
-        for i in active_indices:
-            for word in self.answers_range:
-                pos_letter_freq[i][word[i]] += 1
-                
-        candidates = self.answers_range if len(self.answers_range) <= 3 else ALLOWED
-        answer_set = set(self.answers_range)
-
-        def score(word):
-            seen = set()
-            val = 0
-            for i in active_indices:
-                c = word[i]
-                if c not in seen:
-                    val += pos_letter_freq[i][word[i]]
-                    seen.add(c)
-            return (val, word in answer_set)
-
-        return max(candidates, key=score)
-
-
 class BinarySplit(Handler):
     def guess(self):
         total_left = len(self.answers_range)
@@ -347,17 +308,16 @@ class BinarySplit(Handler):
 
 class FixedIndex(Handler):
     """Select the word at a fixed position the word list"""
-    def __init__(self, pos=2):
-        super().__init__()
-        self.pos = pos
+    POS = 2
 
     def guess(self):
-        return self.answers_range[len(self.answers_range) // self.pos]
+        return self.answers_range[len(self.answers_range) // self.POS]
 
 
 if __name__ == "__main__":
-    from core.game import encode
-    Solver = Entropy   # Bayesian, Minimax, Greedy, Binary
+    from core.game import WORD_LENGTH, encode
+
+    Solver = BiasedEntropy
     agent = Solver()
 
     print("Current solver:", agent)

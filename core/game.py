@@ -9,7 +9,7 @@ def load_words():
 ALLOWED, ANSWERS = load_words()
 
 WORD_LENGTH = len(ALLOWED[0])
-MAX_ATTEMPS = 6
+MAX_ATTEMPTS = 6
 WIN_RESULT = 242
 
 def encode(r):
@@ -60,9 +60,9 @@ if __name__ == "__main__":
     while True:
         answer = random.choice(ANSWERS)  # Select a random word
 
-        for attempt in range(1, MAX_ATTEMPS + 1):
+        for attempt in range(1, MAX_ATTEMPTS + 1):
             while True:
-                guess = input(f"Attempt {attempt}/{MAX_ATTEMPS}: ").strip().upper()
+                guess = input(f"Attempt {attempt}/{MAX_ATTEMPTS}: ").strip().upper()
 
                 # Quit validation
                 if guess in ('Q', 'QUIT', 'E', "EXIT"):

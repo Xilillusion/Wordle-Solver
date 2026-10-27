@@ -1,7 +1,7 @@
 import tkinter as tk
 
 from core.decision_tree import DecisionTree
-from core.game import MAX_ATTEMPS, WORD_LENGTH, WIN_RESULT, encode
+from core.game import MAX_ATTEMPTS, WORD_LENGTH, WIN_RESULT, encode
 from core.solvers import (
     BiasedEntropy,
     BinarySplit,
@@ -80,7 +80,7 @@ def make_guess():
     # Update attempts
     global attempt
     attempt += 1
-    result_label.config(text=f"Attempt {attempt}/{MAX_ATTEMPS}", fg="black")
+    result_label.config(text=f"Attempt {attempt}/{MAX_ATTEMPTS}", fg="black")
 
     # Make guess
     if tree is not None:
@@ -116,8 +116,8 @@ def submit_feedback():
     
     guess = "".join(button.cget("text") for button in feedback_buttons)
     agent.filter(guess, result)
-    if attempt >= MAX_ATTEMPS:
-        result_label.config(text=f"Out of guesses after {MAX_ATTEMPS} attempts.")
+    if attempt >= MAX_ATTEMPTS:
+        result_label.config(text=f"Out of guesses after {MAX_ATTEMPTS} attempts.")
         submit_button.config(state=tk.DISABLED)
         if tree is not None:
             tree.save()

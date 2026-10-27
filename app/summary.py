@@ -164,7 +164,6 @@ def summary(
 if __name__ == "__main__":
     solvers = [
         FixedIndex,
-        PositionalFreq,
         BinarySplit,
         NaiveMinimax,
         Minimax,
